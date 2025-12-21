@@ -1,49 +1,41 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
+// Note : Node 18+ a fetch intégré, donc plus besoin de node-fetch
+// mais on garde une structure ultra-compatible VPS.
 
 const app = express();
-// Le port est dynamique pour s'adapter à Vercel ou à ton futur VPS
 const PORT = process.env.PORT || 3000;
 
-// 1. Sécurité CORS : Autorise uniquement ton site GitHub
-const corsOptions = {
-    origin: 'https://loscripts.github.io',
-    optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
-// 2. La route "Passerelle" vers n8n
 app.post('/chat', async (req, res) => {
     try {
         const n8nUrl = process.env.N8N_WEBHOOK_URL;
-        
-        if (!n8nUrl) {
-            return res.status(500).json({ error: "Configuration manquante sur le serveur." });
-        }
+        if (!n8nUrl) return res.status(500).json({ error: "Config manquante" });
 
-        // Transmission de la question à n8n
         const response = await fetch(n8nUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(req.body)
         });
 
-        const data = await response.json();
+        // --- LA RÉPARATION EST ICI ---
+        const textData = await response.text(); // On lit d'abord en texte (ne plante jamais)
         
-        // Renvoi de la réponse de l'IA à ton site
-        res.json(data);
+        try {
+            const jsonData = JSON.parse(textData); // On essaie de transformer en JSON
+            res.json(jsonData);
+        } catch (e) {
+            // Si n8n a envoyé du texte brut ou du vide
+            res.json({ output: textData || "L'IA n'a rien renvoyé (réponse vide)." });
+        }
 
     } catch (error) {
-        console.error("Erreur Proxy:", error);
-        res.status(500).json({ error: "Erreur de communication avec l'IA." });
+        console.error("Erreur détaillée:", error);
+        res.status(500).json({ error: "Problème de communication avec n8n" });
     }
 });
 
-// 3. Démarrage du serveur
-app.listen(PORT, () => {
-    console.log(`Serveur prêt sur le port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Serveur prêt sur port ${PORT}`));
