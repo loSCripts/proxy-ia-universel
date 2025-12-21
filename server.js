@@ -9,14 +9,15 @@ app.use(express.json());
 
 app.post('/chat', async (req, res) => {
     const n8nUrl = process.env.N8N_WEBHOOK_URL;
+    // Le serveur va chercher la clé PROXY_KEY que tu viens de créer dans Vercel
+    const secretKey = process.env.PROXY_KEY; 
     
     try {
         const response = await fetch(n8nUrl, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                // --- ON ENVOIE LE MOT DE PASSE ICI ---
-                'x-secret-key': '123456' 
+                'x-secret-key': secretKey 
             },
             body: JSON.stringify(req.body)
         });
@@ -32,4 +33,4 @@ app.post('/chat', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => console.log(`Serveur prêt`));
+app.listen(PORT, () => console.log(`Serveur sécurisé prêt`));
