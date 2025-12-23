@@ -4,42 +4,44 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- SÉCURITÉ CORS : Seul ton site peut appeler ce serveur ---
+// SÉCURITÉ : Uniquement ton site officiel
 app.use(cors({
-    origin: 'https://loscripts.github.io' 
+    origin: 'https://loscripts.github.io'
 }));
 
 app.use(express.json());
 
-app.post('/chat', async (req, res) => {
-    // Récupération sécurisée des infos depuis le coffre-fort Vercel
-    const n8nUrl = process.env.N8N_WEBHOOK_URL;
-    const secretKey = process.env.PROXY_KEY; 
-    
+// Fonction universelle pour parler à n8n
+async function callN8n(url, body, res) {
+    const secretKey = process.env.PROXY_KEY;
     try {
-        const response = await fetch(n8nUrl, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                // Envoi de la clé pour passer le nœud Switch1 de n8n
                 'x-secret-key': secretKey 
             },
-            body: JSON.stringify(req.body)
+            body: JSON.stringify(body)
         });
-
         const textData = await response.text();
-        
         try {
-            // Tentative de renvoi du JSON propre de n8n
             res.json(JSON.parse(textData));
         } catch (e) {
-            // Secours si n8n renvoie du texte brut
-            res.json({ output: textData || "Réponse vide de l'IA" });
+            res.json({ output: textData || "Réponse vide" });
         }
     } catch (error) {
-        console.error("Erreur communication:", error);
-        res.status(500).json({ error: "Le bouclier n'a pas pu contacter n8n." });
+        res.status(500).json({ error: "Erreur de communication avec n8n" });
     }
+}
+
+// ROUTE 1 : Pour ton premier assistant (Expert IA)
+app.post('/chat', (req, res) => {
+    callN8n(process.env.N8N_WEBHOOK_URL, req.body, res);
 });
 
-app.listen(PORT, () => console.log(`Serveur prêt et protégé`));
+// ROUTE 2 : Pour ton deuxième assistant (IA Système Simple)
+app.post('/chat-simple', (req, res) => {
+    callN8n(process.env.N8N_WEBHOOK_URL_SIMPLE, req.body, res);
+});
+
+app.listen(PORT, () => console.log(`Bouclier multi-tunnels prêt`));
